@@ -10,7 +10,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
-import { TokenStore } from './TokenStore.js';
+import { tokenStore } from './TokenStore.js';
 import { SessionData } from "./SessionData.js";
 
 export class EntraIdServerAuthProvider implements OAuthServerProvider {
@@ -19,7 +19,6 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
     private _clientsFilePath: string;
     private _sessionStore: Map<string, SessionData> = new Map();
     private _confidentialClient: ConfidentialClientApplication;
-    private _tokenStore: TokenStore = new TokenStore();
     private _tempAuthCodes: Map<string, { sessionToken: string, expires: number }> = new Map();
 
     /**
@@ -67,7 +66,7 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
         });
 
         setInterval(() => {
-            this._tokenStore.cleanExpiredTokens();
+            tokenStore.cleanExpiredTokens();
         }, 60000);
     }
 
@@ -243,7 +242,7 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
 
             // Get the session token to find the associated challenge
             const sessionToken = tempCodeData.sessionToken;
-            const storedToken = this._tokenStore.getToken(sessionToken);
+            const storedToken = tokenStore.getToken(sessionToken);
 
             if (!storedToken) {
                 throw new Error("Invalid session token");
@@ -280,7 +279,7 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
      * @returns Promise with authentication information
      */
     async verifyAccessToken(token: string): Promise<AuthInfo> {
-        const storedToken = this._tokenStore.getToken(token);
+        const storedToken = tokenStore.getToken(token);
 
         if (!storedToken) {
             throw new Error("Invalid or expired token");
@@ -288,7 +287,7 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
 
         // Check if token has expired
         if (storedToken.expiresAt < Date.now()) {
-            this._tokenStore.removeToken(token);
+            tokenStore.removeToken(token);
             throw new Error("Token has expired");
         }
 
@@ -308,7 +307,6 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async revokeToken(client: OAuthClientInformationFull, request: OAuthTokenRevocationRequest): Promise<void> {
-        // TODO: Implement token revocation functionality
         throw new Error("Token revocation not implemented");
     }
 
@@ -328,7 +326,7 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
 
             // Get the actual session token
             const sessionToken = tempCodeData.sessionToken;
-            const storedToken = this._tokenStore.getToken(sessionToken);
+            const storedToken = tokenStore.getToken(sessionToken);
 
             if (!storedToken) {
                 throw new Error("Invalid session token");
@@ -373,7 +371,7 @@ export class EntraIdServerAuthProvider implements OAuthServerProvider {
             });
 
             // Store the token and get a session token (this will be our actual access token that we'll pass to the client)
-            const sessionToken = this._tokenStore.storeToken(
+            const sessionToken = tokenStore.storeToken(
                 tokenResponse.accessToken,
                 '',
                 tokenResponse.expiresOn ?

@@ -11,6 +11,7 @@ import { ConfidentialClientApplication } from "@azure/msal-node";
 import { Client } from "@microsoft/microsoft-graph-client";
 import 'isomorphic-fetch';
 import dotenv from 'dotenv';
+import { tokenStore } from "./auth/TokenStore.js";
 
 dotenv.config();
 
@@ -71,28 +72,24 @@ export const createServer = () => {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name } = request.params;
     const context = request.params?.context as { token?: string } | undefined;
-    const token = context?.token;
+    const sessionToken = context?.token;
 
     if (name === ToolName.GET_USER_DETAILS) {
       try {
-        if (!token) {
+        if (!sessionToken) {
           throw new Error("No authentication token provided");
         }
 
-        const oboRequest = {
-          oboAssertion: token,
-          scopes: ["User.Read"],
-        };
-
-        const response = await confidentialClient.acquireTokenOnBehalfOf(oboRequest);
-
-        if (!response?.accessToken) {
-          throw new Error("Failed to acquire token for Microsoft Graph");
+        const tokenData = tokenStore.getToken(sessionToken);
+        if (!tokenData) {
+          throw new Error("Invalid or expired session token");
         }
+
+        const entraIdToken = tokenData.accessToken;
 
         const graphClient = Client.init({
           authProvider: (done) => {
-            done(null, response.accessToken);
+            done(null, entraIdToken);
           }
         });
 
